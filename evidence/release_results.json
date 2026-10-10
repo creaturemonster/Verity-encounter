@@ -1,0 +1,20 @@
+{
+  "product": "Verity Encounter 1.0.0",
+  "built_at_utc": "2026-10-10T00:52:55.175099+00:00",
+  "python": "3.13.5",
+  "automated_tests_passed": 115,
+  "automated_tests_failed": 0,
+  "browser_workflow_checks_passed": 34,
+  "browser_workflow_checks_failed": 0,
+  "live_http_server_tested": true,
+  "cli_entrypoint_tested": true,
+  "javascript_syntax": "passed",
+  "python_compilation": "passed",
+  "real_model_api_called": false,
+  "case_clinical_validation": false,
+  "educational_effectiveness_validated": false,
+  "native_browser_localhost_navigation_tested": false,
+  "native_browser_limitation": "Sandbox blocks Chromium localhost navigation; actual shipped frontend tested via offline DOM and real HTTP bridge.",
+  "competition_percentile": "not measured",
+  "production_ready": false
+}

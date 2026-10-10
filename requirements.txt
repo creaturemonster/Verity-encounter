@@ -1,0 +1,2 @@
+# No third-party runtime dependencies. Python 3.10+ with SQLite is sufficient.
+# Optional browser verification uses separately installed Playwright and Chromium.

@@ -1,0 +1,14 @@
+VERITY ENCOUNTER — SYNTHETIC TEACHING MATERIAL
+
+Fictional patient: Jordan Avery
+This is not a real laboratory report. Not for diagnosis, treatment or clinical use.
+
+Case-author-supplied values:
+Hemoglobin: 10.8 g/dL
+Mean corpuscular volume: 74 fL
+
+No other CBC values are supplied. Reference ranges and a final interpretation
+are intentionally not supplied. Do not infer missing values or a diagnosis.
+
+Attach this file to the “Synthetic CBC extract” fact in Patient Studio.
+Save/approve the new revision, start a new encounter and request the CBC.

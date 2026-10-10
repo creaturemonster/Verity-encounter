@@ -1,0 +1,19 @@
+# Local container. Uses config/local.env, then publishes the app on port 8080.
+# The process inside the container must listen on 0.0.0.0; the database lives on the volume.
+services:
+  verity:
+    build: .
+    image: verity-encounter:local
+    ports:
+      - "8080:8080"
+    env_file:
+      - config/local.env
+    environment:
+      VERITY_HOST: 0.0.0.0
+      VERITY_DB: /data/verity.sqlite3
+    volumes:
+      - verity-data:/data
+    restart: unless-stopped
+
+volumes:
+  verity-data:

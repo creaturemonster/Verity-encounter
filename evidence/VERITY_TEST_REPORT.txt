@@ -1,0 +1,25 @@
+VERITY ENCOUNTER 1.0.0 — RELEASE VERIFICATION
+
+Executed: 2026-10-10T00:52:55.175099+00:00
+Runtime: Python 3.13.5
+
+PASS: 115 automated engine, service, HTTP and provider-contract tests.
+PASS: 34 Chromium UI workflow checks.
+PASS: Real subprocess startup of run.py; HTTP health and index responses.
+PASS: JavaScript syntax check and Python compilation.
+
+Scope of UI verification: shipped HTML/CSS/JS, rendered in an offline Chromium
+document, with fetch requests bridged to the real local HTTP server and cookie
+jar. Direct Chromium-to-localhost navigation is blocked by the evaluation
+environment. Native download UI, browser compatibility and deployed hosting
+were not tested.
+
+No live model API call was made. Provider payload, malformed output, refusal,
+timeout and fallback paths were tested using mocks. No real patient data was
+used. Synthetic case content is not clinician-validated. No educational
+effectiveness, competency validity, competition rank or win probability is
+claimed. This is a local user-testing prototype, not a production deployment.
+
+Evidence is included in evidence/unittest_results.txt, browser_results.json,
+cli_smoke.json and source_manifest.json. The source manifest records hashes of
+the shipped source files; it is not an independent audit.

@@ -1,0 +1,8 @@
+{
+  "entrypoint_started": true,
+  "healthcheck": "ok",
+  "index_served": true,
+  "port": 36235,
+  "runtime": "Python 3.13.5",
+  "note": "Real subprocess invocation of the shipped run.py. No provider connection."
+}

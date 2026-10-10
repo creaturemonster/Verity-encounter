@@ -1,0 +1,61 @@
+{
+  "family": "verity-encounter",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/verity-encounter-execution",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/verity-encounter-task",
+  "containerDefinitions": [
+    {
+      "name": "verity",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/verity-encounter:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp",
+          "name": "http"
+        }
+      ],
+      "environment": [
+        {"name": "VERITY_CONFIG", "value": "/app/config/aws.env"},
+        {"name": "VERITY_HOST", "value": "0.0.0.0"},
+        {"name": "VERITY_PORT", "value": "8080"},
+        {"name": "VERITY_DB", "value": "/data/verity.sqlite3"},
+        {"name": "VERITY_COOKIE_SECURE", "value": "1"},
+        {"name": "VERITY_BEHIND_PROXY", "value": "1"},
+        {"name": "VERITY_ALLOWED_HOSTS", "value": "verity.example.com"},
+        {"name": "VERITY_SEMANTIC", "value": "0"},
+        {"name": "VERITY_HARVEST", "value": "0"},
+        {"name": "OPENAI_MODEL", "value": "gpt-4.1"}
+      ],
+      "secrets": [
+        {
+          "name": "VERITY_FACULTY_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:verity/faculty-password"
+        }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=3)\""
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/verity-encounter",
+          "awslogs-region": "REGION",
+          "awslogs-stream-prefix": "verity"
+        }
+      },
+      "user": "verity"
+    }
+  ]
+}

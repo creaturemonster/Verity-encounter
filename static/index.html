@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Faculty-authored virtual patients with traceable responses and evidence-linked feedback. Synthetic teaching prototype."><title>Verity Encounter — Learn from evidence</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<aside class="sidebar">
+<a href="#library" class="brand"><img src="/favicon.svg" alt="" width="38" height="38"><span>verity<span class="brand-sub">ENCOUNTER STUDIO</span></span></a>
+<div class="nav-heading">LEARNING WORKSPACE</div>
+<nav aria-label="Main navigation"><button data-nav="library" class="nav-item active"><span>◫</span> Patient library</button><button data-nav="history" class="nav-item"><span>↺</span> My encounters</button><button data-nav="studio" class="nav-item"><span>◇</span> Patient Studio</button><button data-nav="quality" class="nav-item"><span>⌁</span> Quality & evidence</button></nav>
+<div class="side-note"><div class="little-line"></div><strong>Author the case.<br>Trace every answer.</strong><p>A teaching experience grounded in faculty-approved facts.</p></div>
+<div class="side-bottom"><div class="status-dot"></div><span>Synthetic patients only<br><small>Local research prototype · v1.0</small></span></div>
+</aside>
+<div class="shell"><header class="topbar"><div><span class="breadcrumb">TwinVerse</span><span class="divider">/</span><strong>Virtual Patient Encounter</strong></div><div class="top-actions"><span id="engine-badge" class="badge">Local mode</span><button id="faculty-toggle" class="subtle">Faculty access</button></div></header>
+<main id="main" tabindex="-1"></main><footer>VERITY ENCOUNTER <span>Practice and formative feedback only. Not clinical care or competency certification.</span></footer></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<dialog id="login-dialog"><form id="login-form"><div class="eyebrow">PATIENT STUDIO</div><h2>Faculty access</h2><p>Enter the passphrase printed in the terminal when Verity starts. This is a local demo gate, not institutional identity verification.</p><label for="password">Faculty passphrase</label><input id="password" type="password" autocomplete="current-password" required><div id="login-error" class="error" role="alert"></div><div class="button-row"><button type="button" data-close-login class="secondary">Cancel</button><button type="submit" class="primary">Open Studio</button></div></form></dialog>
+<dialog id="confirm-dialog"><form method="dialog"><div class="eyebrow">REVIEW REQUIRED</div><h2 id="confirm-title"></h2><p id="confirm-text"></p><div class="button-row"><button value="cancel" class="secondary">Cancel</button><button value="ok" class="primary">Confirm</button></div></form></dialog>
+</body></html>
