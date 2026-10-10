@@ -17,10 +17,10 @@ class ServiceTests(unittest.TestCase):
     def upload(self):
         c=self.s.get_case(self.cid,True)
         return self.s.upload(self.cid,'cbc','synthetic.txt',base64.b64encode(b'Synthetic lab report only').decode(),c['revision'],'faculty')
-    def test_three_demo_cases(self):self.assertEqual(3,len(self.s.list_cases()))
-    def test_seeding_idempotent(self):self.s.seed();self.assertEqual(3,len(self.s.list_cases()))
+    def test_three_demo_cases(self):self.assertEqual(4,len(self.s.list_cases()))
+    def test_seeding_idempotent(self):self.s.seed();self.assertEqual(4,len(self.s.list_cases()))
     def test_unapproved_draft_not_in_student_library(self):
-        self.s.create_case(cases()[0],'faculty');self.assertEqual(3,len(self.s.list_cases()));self.assertEqual(4,len(self.s.list_cases(True)))
+        self.s.create_case(cases()[0],'faculty');self.assertEqual(4,len(self.s.list_cases()));self.assertEqual(5,len(self.s.list_cases(True)))
     def test_unapproved_case_cannot_start(self):
         d=self.s.create_case(cases()[0],'faculty')
         with self.assertRaises(Problem) as c:self.s.start(d['id'],self.owner)

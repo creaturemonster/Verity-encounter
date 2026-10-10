@@ -23,7 +23,7 @@ An occupied port is handled with an explanatory error. Use `python run.py --port
 
 - Patient Studio: no-code profile, exact patient answers, question phrases, disclosure rules, prerequisite facts, communication gates, objectives, weights and faculty-marked critical elements.
 - Separate save-draft and approve-version actions; structural validation, revision conflicts and immutable encounter snapshots.
-- Three entirely fictional teaching fixtures. Their workflow approval is explicitly labeled **Demo fixture—not clinician reviewed**.
+- Four entirely fictional teaching fixtures. Their workflow approval is explicitly labeled **Demo fixture—not clinician reviewed**.
 - Split-screen encounter: patient transcript and progressive chart. Unrevealed fact content is not returned in the learner projection.
 - Fact-ID router with exact quotation of approved clinical text. Missing details are simulation notes, not invented denials.
 - Uploads of synthetic PDF, PNG, JPEG and UTF-8 text reports; 2 MB limit, file signature checks, immutable storage and hashes. Materials are downloadable only after their linked fact is disclosed. Uploading changes the draft and requires reapproval.
