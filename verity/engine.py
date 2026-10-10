@@ -12,11 +12,22 @@ import unicodedata
 from datetime import datetime, timezone
 from typing import Callable
 
+_FEELING = r"(?:difficult|frustrating|scary|hard|worrying|stressful|overwhelming)"
+_DEGREE = r"(?:very |really |so )?"
 SIGNALS = {
     'introduction': r"\b(my name is|i am (?:a |your )?(?:medical |nursing |healthcare )?student|i'm (?:a |your )?(?:medical |nursing |healthcare )?student)\b",
     'permission': r"\b(is it (?:okay|ok)|may i|would it be (?:okay|ok)|do i have your permission)\b",
     'open_question': r"\b(tell me (?:more|about)|what (?:brings|matters|concerns)|how has .+ affected|walk me through|describe (?:what|how))\b",
-    'empathy': r"\b(that sounds (?:difficult|frustrating|scary|hard|worrying)|i can (?:see|hear|understand)|thank you for (?:sharing|telling)|i'm sorry|i am sorry|it sounds (?:difficult|frustrating|scary|hard))\b",
+    'empathy': (
+        r"\b(?:that sounds " + _DEGREE + _FEELING
+        + r"|it sounds " + _DEGREE + _FEELING
+        + r"|i can (?:see|hear|understand)"
+        + r"|thank you for (?:sharing|telling)"
+        + r"|i'm sorry|i am sorry|i hear you"
+        + r"|i understand (?:that|how|why)(?:\s+\w+){0,8}\s+" + _DEGREE + _FEELING
+        + r"|(?:that|this|it) (?:can be|must be|must feel|has been) " + _DEGREE + _FEELING
+        + r")\b"
+    ),
     'summary': r"\b(let me (?:summarize|check|make sure)|what i(?:'ve| have) heard|to summarize|have i understood)\b",
     'teach_back': r"\b(in your own words|tell me what you understand|tell me how you would explain)\b",
 }
@@ -26,7 +37,7 @@ SIGNAL_LABELS = {
     'summary': 'Summary / understanding check', 'teach_back': 'Teach-back invitation',
 }
 INJECTION = re.compile(r"\b(ignore (?:all |the |your |previous )*(?:instructions|rules|profile)|system prompt|developer message|reveal (?:all|the hidden|the diagnosis|the answer key)|give me (?:all|the hidden|the answer key)|pretend (?:that )?(?:your|you have)|change (?:your|the) (?:history|allergies|diagnosis)|you are now|act as (?:the )?(?:system|developer))\b", re.I)
-NEGATED_SIGNAL = re.compile(r"\b(not sorry|don't care|do not care|not difficult|not scary|not frustrating)\b", re.I)
+NEGATED_SIGNAL = re.compile(r"\b(not sorry|don't care|do not care|not difficult|not scary|not frustrating|not stressful|not overwhelming|do not understand|don't understand)\b", re.I)
 UNKNOWN = 'This detail is not specified in the approved case. No clinical answer has been inferred.'
 
 
@@ -161,8 +172,9 @@ def signals_in(text: str) -> dict:
     n = unicodedata.normalize('NFKC', text).replace('’', "'")
     found = {}
     for key, pattern in SIGNALS.items():
-        match = re.search(pattern, n, re.I)
-        if match and not (key == 'empathy' and NEGATED_SIGNAL.search(n)):
+        matches = list(re.finditer(pattern, n, re.I))
+        if matches and not (key == 'empathy' and NEGATED_SIGNAL.search(n)):
+            match = max(matches, key=lambda item: len(item.group(0)))
             found[key] = {'quote': match.group(0), 'message': text}
     return found
 

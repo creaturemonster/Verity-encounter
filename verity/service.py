@@ -108,10 +108,19 @@ class Service:
     def seed(self):
         from .seeds import cases
         with self.db() as conn:
-            if conn.execute('SELECT COUNT(*) FROM cases').fetchone()[0]: return
+            rows = conn.execute('SELECT draft, published FROM cases').fetchall()
+        titles = set()
+        for row in rows:
+            for blob in (row['draft'], row['published']):
+                if not blob:
+                    continue
+                titles.add(json.loads(blob).get('title'))
         for case in cases():
+            if case.get('title') in titles:
+                continue
             saved = self.create_case(case, 'fixture-loader')
             self.publish(saved['id'], saved['revision'], 'Demo fixture—not clinician reviewed', 'fixture-loader')
+            titles.add(case['title'])
 
     def _case(self, conn, cid):
         row = conn.execute('SELECT * FROM cases WHERE id=?', (cid,)).fetchone()

@@ -15,7 +15,7 @@ def objective(oid, title, fids=(), signal='', critical=False, weight=1):
 def cases():
     a = {
         'title': 'A change in energy', 'setting': 'Outpatient interview',
-        'description': 'Explore a new symptom, medication history and an everyday barrier to follow-up.',
+        'description': 'Explore a new symptom, whether current treatment is alleviating it, medication history and an everyday barrier to follow-up.',
         'author': 'Verity synthetic demo fixture', 'synthetic': True,
         'patient': {'name': 'Jordan Avery', 'age': 42, 'pronouns': 'they/them'},
         'facts': [
@@ -24,16 +24,18 @@ def cases():
             fact('impact', 'Impact on daily life', 'I used to walk home without stopping. Now I often stop to rest halfway.', ['affected','daily life','impact','what brings','tell me more','tell me about','walk me through']),
             fact('associated', 'Associated symptoms', 'I sometimes feel lightheaded when I stand up quickly. I have not had chest pain or a fever.', ['other symptoms','lightheaded','dizzy','chest pain','fever','anything else']),
             fact('medications', 'Medicines and supplements', 'I take cetirizine for seasonal allergies. I am not taking any supplements.', ['medications','medicines','medicine','medication','supplements','taking','tablets']),
+            fact('response', 'Treatment response', 'The cetirizine helps the itching from my seasonal allergies. It has not alleviated the tiredness.', ['alleviating the symptoms','alleviating','is it helping','helped you','cetirizine helped','has it helped','symptom relief','is it working','getting better','any relief','medication helping','helping the symptoms']),
             fact('allergies', 'Reported allergy history', 'I developed an itchy rash after taking penicillin when I was a teenager.', ['allergies','allergic','drug reactions','penicillin']),
             fact('sleep', 'Sleep and schedule', 'I started working nights a month ago. I usually sleep four or five hours during the day.', ['sleep','sleeping','work','schedule','night shift']),
             fact('concern', 'Patient perspective', 'I am worried that I will lose my job if I keep asking for breaks.', ['worries','worried','concerns','concerned','what matters','what concerns']),
             fact('barrier', 'Follow-up barrier', 'I have been putting off appointments because I cannot afford to miss a shift.', ['afford','cost','barrier','appointments','miss a shift','money'], group='Patient context'),
             fact('cbc', 'Synthetic CBC extract', 'Synthetic teaching report: hemoglobin 10.8 g/dL; MCV 74 fL. No other CBC results are supplied in this case.', ['cbc','blood count','lab results','labs','hemoglobin'], group='Investigations', disclosure='record'),
-            fact('teaching_note', 'Faculty note', 'Do not infer a final diagnosis from this sparse fictional profile. The task is history elicitation, not treatment.', group='Faculty only', disclosure='faculty_only'),
+            fact('teaching_note', 'Faculty note', 'Do not infer a final diagnosis from this sparse fictional profile. The task is history elicitation, not treatment. Whether cetirizine is alleviating symptoms is scripted history, not a treatment recommendation.', group='Faculty only', disclosure='faculty_only'),
         ],
         'objectives': [
             objective('history', 'Establish the symptom timeline and functional impact', ['onset','impact'], weight=2),
             objective('medication_safety', 'Elicit medicines and reported allergies', ['medications','allergies'], critical=True, weight=2),
+            objective('response', 'Ask whether current treatment is alleviating the symptoms', ['response'], weight=2),
             objective('context', 'Explore sleep, concerns and barriers to follow-up', ['sleep','concern','barrier'], weight=2),
             objective('records', 'Request and review the supplied investigation', ['cbc']),
             objective('empathy', 'Acknowledge the patient’s concern', signal='empathy'),
@@ -90,4 +92,28 @@ def cases():
             objective('summary', 'Offer a summary or understanding check', signal='summary'),
         ],
     }
-    return copy.deepcopy([a, b, c])
+    d = {
+        'title': 'When the week feels stressful', 'setting': 'Outpatient interview',
+        'description': 'Practice an acknowledgment such as “I understand that can be very stressful,” then ask what has been weighing on the patient.',
+        'author': 'Verity synthetic demo fixture', 'synthetic': True,
+        'patient': {'name': 'Quinn Hale', 'age': 47, 'pronouns': 'she/her'},
+        'facts': [
+            fact('opening', 'Presenting concern', 'This week has been a lot, and I almost talked myself out of coming in.', group='Presenting concern', disclosure='initial'),
+            fact('story', 'What has been happening', 'Work has piled up, and I have been looking after my father in the evenings. I came to talk it through. I do not have a diagnosis to report.', ['tell me more', 'tell me about', 'what brings', 'what has been happening', 'going on', 'this week']),
+            fact('impact', 'Effect on daily life', 'I have been short with people at home, and I am waking up tired.', ['affected', 'daily life', 'sleep', 'sleeping', 'family', 'short with']),
+            fact('acknowledgment', 'Response to an acknowledgment', 'Thank you. It helps to hear that you understand. It has been very stressful.', ['understand that can be', 'understand how stressful', 'understand how hard', 'understand how difficult', 'very stressful', 'can be stressful', 'must be stressful', 'has been stressful', 'that sounds difficult', 'that sounds stressful', 'that sounds hard', 'that sounds scary', 'that sounds worrying', 'sounds frustrating', 'sounds overwhelming', 'it sounds difficult', 'it sounds stressful', 'thank you for sharing', 'thank you for telling']),
+            fact('worry', 'What feels heavy', 'I am afraid I will miss something important for my father if I keep pushing through the week.', ['worried', 'worry', 'afraid', 'concern', 'concerns', 'what matters', 'what concerns', 'father']),
+            fact('support', 'Help at home', 'My sister stays with him on weekends. On weeknights it is usually me.', ['who helps', 'help at home', 'sister', 'support', 'weekends'], group='Patient context'),
+            fact('teaching_note', 'Faculty note', 'This fictional case answers scripted acknowledgments with approved text. A matched phrase is not a validated empathy score.', group='Faculty only', disclosure='faculty_only'),
+        ],
+        'objectives': [
+            objective('history', 'Invite the story and its effect on daily life', ['story', 'impact'], weight=2),
+            objective('empathy', 'Acknowledge that the week can feel stressful', ['acknowledgment'], signal='empathy', weight=2),
+            objective('concern', 'Ask what feels heavy after an acknowledgment', ['worry'], weight=2),
+            objective('context', 'Ask who helps at home', ['support']),
+            objective('opening_skill', 'Open with an invitation to tell the story', signal='open_question'),
+        ],
+    }
+    for fid in ('acknowledgment', 'worry'):
+        next(f for f in d['facts'] if f['id'] == fid)['requires_empathy'] = True
+    return copy.deepcopy([a, b, c, d])

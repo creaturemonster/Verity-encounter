@@ -40,6 +40,11 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(['impact'],rule_route('Tell me more.',self.case['facts']))
     def test_specific_topic_beats_broad_alias(self):
         self.assertEqual(['medications'],rule_route('Tell me about medications.',self.case['facts']))
+    def test_treatment_response_quotes_approved_answer(self):
+        s=self.ask('Is it alleviating the symptoms?')
+        self.assertEqual(['response'],s['messages'][-1]['fact_ids'])
+        self.assertEqual('patient',s['messages'][-1]['role'])
+        self.assertIn('has not alleviated the tiredness',s['messages'][-1]['text'])
     def test_multi_topic_two_fact_limit(self):
         self.assertLessEqual(len(rule_route('allergies medications sleep',self.case['facts'])),2)
     def test_repeated_question_is_consistent(self):
@@ -58,6 +63,28 @@ class EngineTests(unittest.TestCase):
         self.assertNotIn('barrier',self.state['revealed'])
     def test_sensitive_gate_opens_after_empathy_pattern(self):
         self.ask('That sounds difficult.');self.ask('Can you afford appointments?');self.assertIn('barrier',self.state['elicited'])
+    def test_empathic_statement_is_observed(self):
+        found=signals_in('I see. I understand that can be very stressful.')
+        self.assertIn('empathy',found)
+        self.assertIn('stressful',found['empathy']['quote'].lower())
+    def test_negated_stress_is_not_empathy(self):
+        self.assertNotIn('empathy',signals_in('I understand that this is not stressful.'))
+    def test_clinical_see_is_not_empathy(self):
+        self.assertNotIn('empathy',signals_in('I see a rash. When did it start?'))
+    def test_empathy_case_answers_with_approved_text(self):
+        case=next(c for c in cases() if c['title']=='When the week feels stressful')
+        state=advance(case,new_state(case),'I see. I understand that can be very stressful.')
+        reply=next(m for m in reversed(state['messages']) if m['role']=='patient' and m['turn']>0)
+        self.assertEqual(['acknowledgment'],reply['fact_ids'])
+        self.assertIn('very stressful',reply['text'])
+        self.assertNotEqual('abstention',state['messages'][-1]['source'])
+        state=advance(case,state,'What worries you about your father?')
+        self.assertIn('worry',state['elicited'])
+    def test_empathy_case_gates_worry_until_acknowledgment(self):
+        case=next(c for c in cases() if c['title']=='When the week feels stressful')
+        state=advance(case,new_state(case),'What worries you about your father?')
+        self.assertEqual('disclosure-gate',state['messages'][-1]['source'])
+        self.assertNotIn('worry',state['revealed'])
     def test_negated_empathy_is_not_observed(self):
         self.assertNotIn('empathy',signals_in('I am not sorry. I do not care.'))
     def test_prerequisite_gates(self):
