@@ -61,7 +61,7 @@ def main():
                 }''')
                 page.add_script_tag(content=(ROOT/'static/app.js').read_text())
                 page.wait_for_selector('.case-card')
-                check('Library renders all four synthetic cases',page.locator('.case-card').count()==4)
+                check('Library renders the demo fixtures and faculty sample profiles',page.locator('.case-card').count()==12)
                 check('Desktop has no horizontal overflow',page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
                 page.screenshot(path=str(OUT/'library_desktop.png'),full_page=True)
                 page.locator('[data-action="start"]').first.click()

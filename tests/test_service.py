@@ -17,10 +17,10 @@ class ServiceTests(unittest.TestCase):
     def upload(self):
         c=self.s.get_case(self.cid,True)
         return self.s.upload(self.cid,'cbc','synthetic.txt',base64.b64encode(b'Synthetic lab report only').decode(),c['revision'],'faculty')
-    def test_three_demo_cases(self):self.assertEqual(4,len(self.s.list_cases()))
-    def test_seeding_idempotent(self):self.s.seed();self.assertEqual(4,len(self.s.list_cases()))
+    def test_three_demo_cases(self):self.assertEqual(12,len(self.s.list_cases()))
+    def test_seeding_idempotent(self):self.s.seed();self.assertEqual(12,len(self.s.list_cases()))
     def test_unapproved_draft_not_in_student_library(self):
-        self.s.create_case(cases()[0],'faculty');self.assertEqual(4,len(self.s.list_cases()));self.assertEqual(5,len(self.s.list_cases(True)))
+        self.s.create_case(cases()[0],'faculty');self.assertEqual(12,len(self.s.list_cases()));self.assertEqual(13,len(self.s.list_cases(True)))
     def test_unapproved_case_cannot_start(self):
         d=self.s.create_case(cases()[0],'faculty')
         with self.assertRaises(Problem) as c:self.s.start(d['id'],self.owner)
@@ -30,6 +30,17 @@ class ServiceTests(unittest.TestCase):
     def test_patient_metadata_is_allowlisted(self):
         d=self.s.get_case(self.cid,True);d['case']['patient']['hidden_secret']='do not leak';d=self.s.save_case(self.cid,d['case'],d['revision'],'faculty');self.s.publish(self.cid,d['revision'],'Reviewer','faculty')
         self.assertNotIn('hidden_secret',json.dumps(self.s.get_case(self.cid)));self.assertNotIn('hidden_secret',json.dumps(self.start()))
+    def test_portrait_path_is_allowlisted(self):
+        d=self.s.get_case(self.cid,True)
+        d['case']['patient']['photo']='https://example.invalid/face.jpg'
+        d=self.s.save_case(self.cid,d['case'],d['revision'],'faculty')
+        self.s.publish(self.cid,d['revision'],'Reviewer','faculty')
+        self.assertNotIn('example.invalid',json.dumps(self.s.get_case(self.cid)))
+        d=self.s.get_case(self.cid,True)
+        d['case']['patient']['photo']='/static/patients/vladko-bareche.jpg'
+        d=self.s.save_case(self.cid,d['case'],d['revision'],'faculty')
+        self.s.publish(self.cid,d['revision'],'Reviewer','faculty')
+        self.assertEqual('/static/patients/vladko-bareche.jpg',self.s.get_case(self.cid)['patient']['photo'])
     def test_learner_session_contains_only_opening(self):
         e=self.start();text=json.dumps(e);self.assertNotIn('penicillin',text);self.assertNotIn('cbc',text);self.assertNotIn('teaching_note',text)
     def test_encounter_isolated_between_users(self):
@@ -116,6 +127,25 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(patient)
         self.assertNotIn('Example Journal', patient[0]['text'])
         self.assertNotIn('outpatient care', patient[0]['text'])
+    def test_sample_courses_fill_knowledge_table(self):
+        with self.s.db() as conn:
+            count=conn.execute('SELECT COUNT(*) FROM course_knowledge').fetchone()[0]
+            leaked=conn.execute("SELECT COUNT(*) FROM course_knowledge WHERE summary LIKE '%Faculty direction%' OR summary LIKE '%pack of cigarettes%'").fetchone()[0]
+        self.assertGreaterEqual(count, 8)
+        self.assertEqual(0, leaked)
+        again=self.s.ingest_course_knowledge()
+        self.assertFalse(again['changed'])
+        case=next(c for c in self.s.list_cases() if c['title']=='Cholesterol, and a reluctance to take medicine')
+        e=self.s.start(case['id'], self.owner)
+        result=self.s.turn(e['id'], self.owner, 'Can I see the cholesterol results?', 'course-know-01', e['revision'])
+        matched=[item for item in result['knowledge'] if item['kind']=='Sample course']
+        self.assertTrue(matched)
+        self.assertIn('lipid', matched[0]['title'].lower())
+        self.assertEqual('Cholesterol, and a reluctance to take medicine', matched[0]['journal'])
+        spoken=[m['text'] for m in result['messages'] if m['turn']==result['turn'] and m['role'] in ('patient','record')]
+        self.assertTrue(spoken)
+        self.assertIn('260', spoken[0])
+        self.assertNotIn('Sample course topic', spoken[0])
     def test_literature_library_stores_pubmed_records(self):
         rec={'pmid':'12345678','title':'A real indexed title','journal':'Example Medical Journal','year':'2024','publication_types':['Practice Guideline'],'url':'https://pubmed.ncbi.nlm.nih.gov/12345678/'}
         first=self.s.remember_literature('fatigue', [rec], 'faculty')

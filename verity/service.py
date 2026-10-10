@@ -11,6 +11,18 @@ from contextlib import contextmanager
 from pathlib import Path
 from .engine import advance, canonical, debrief, digest, new_state, now, normalize, validate_case, valid_text
 
+_PORTRAIT = re.compile(r'/static/patients/[a-z0-9-]+\.jpg')
+
+
+def public_patient(patient: dict) -> dict:
+    """Learner-visible identity. A portrait is included only for a local sample file."""
+    shown = {k: patient.get(k, '') for k in ('name', 'age', 'pronouns')}
+    photo = patient.get('photo', '')
+    if isinstance(photo, str) and _PORTRAIT.fullmatch(photo):
+        shown['photo'] = photo
+    return shown
+
+
 class Problem(Exception):
     def __init__(self, status: int, message: str, details=None):
         super().__init__(message)
@@ -69,8 +81,19 @@ class Service:
                     found_at TEXT NOT NULL,
                     PRIMARY KEY (pmid, query)
                 );
+                CREATE TABLE IF NOT EXISTS course_knowledge (
+                    id TEXT PRIMARY KEY,
+                    case_title TEXT NOT NULL,
+                    topic TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    terms TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS course_knowledge_case ON course_knowledge(case_title);
             ''')
         if seed: self.seed()
+        self.ingest_course_knowledge()
 
     @contextmanager
     def db(self, write=False):
@@ -106,6 +129,7 @@ class Service:
         return {'consistent':True, 'events':len(rows), 'head_hash':previous, 'limitation':'Local hash chain; not externally anchored or tamper-proof.'}
 
     def seed(self):
+        from .faculty_samples import cases as faculty_cases
         from .seeds import cases
         with self.db() as conn:
             rows = conn.execute('SELECT draft, published FROM cases').fetchall()
@@ -115,12 +139,67 @@ class Service:
                 if not blob:
                     continue
                 titles.add(json.loads(blob).get('title'))
-        for case in cases():
-            if case.get('title') in titles:
+        batches = (
+            (cases(), 'Demo fixture—not clinician reviewed'),
+            (faculty_cases(), 'Faculty sample CSV—not clinician reviewed'),
+        )
+        for batch, reviewer in batches:
+            for case in batch:
+                if case.get('title') in titles:
+                    continue
+                saved = self.create_case(case, 'fixture-loader')
+                self.publish(saved['id'], saved['revision'], reviewer, 'fixture-loader')
+                titles.add(case['title'])
+
+    def ingest_course_knowledge(self) -> dict:
+        """Replace the course-knowledge table with topics from the sample courses."""
+        from .course_knowledge import course_knowledge_rows
+        rows = course_knowledge_rows()
+        stamp = now()
+        incoming_rows = sorted(
+            [{k: row[k] for k in ('id', 'case_title', 'topic', 'summary', 'terms', 'kind')} for row in rows],
+            key=lambda row: row['id'],
+        )
+        incoming = canonical(incoming_rows)
+        with self.db(True) as conn:
+            stored = [dict(r) for r in conn.execute('SELECT id, case_title, topic, summary, terms, kind FROM course_knowledge ORDER BY id').fetchall()]
+            for item in stored:
+                item['terms'] = json.loads(item['terms'])
+            if canonical(stored) == incoming:
+                return {'stored': len(rows), 'changed': False}
+            conn.execute('DELETE FROM course_knowledge')
+            conn.executemany(
+                'INSERT INTO course_knowledge(id, case_title, topic, summary, terms, kind, updated_at) VALUES(?,?,?,?,?,?,?)',
+                [(row['id'], row['case_title'], row['topic'], row['summary'], json.dumps(row['terms']), row['kind'], stamp) for row in rows],
+            )
+            self.audit(conn, 'course-knowledge', 'course_knowledge.ingest', {'stored': len(rows)})
+        return {'stored': len(rows), 'changed': True}
+
+    def match_course_knowledge(self, question: str, case_title: str = '', limit: int = 3) -> list[dict]:
+        from .course_knowledge import STOP
+        tokens = {part for part in normalize(question).split() if len(part) >= 3 and part not in STOP}
+        if not tokens:
+            return []
+        with self.db() as conn:
+            rows = conn.execute('SELECT case_title, topic, summary, terms, kind FROM course_knowledge').fetchall()
+        ranked = []
+        for row in rows:
+            terms = json.loads(row['terms'] or '[]')
+            blob = set()
+            for term in terms:
+                blob.add(term)
+                blob.update(str(term).split())
+            overlap = len(tokens & blob)
+            if not overlap:
                 continue
-            saved = self.create_case(case, 'fixture-loader')
-            self.publish(saved['id'], saved['revision'], 'Demo fixture—not clinician reviewed', 'fixture-loader')
-            titles.add(case['title'])
+            if case_title and row['case_title'] == case_title:
+                overlap += 2
+            ranked.append((overlap, row['case_title'], {
+                'pmid': '', 'title': row['topic'], 'journal': row['case_title'], 'year': '',
+                'url': '', 'kind': row['kind'], 'summary': row['summary'],
+            }))
+        ranked.sort(key=lambda item: (-item[0], item[1], item[2]['title']))
+        return [item[2] for item in ranked[: max(1, min(int(limit), 5))]]
 
     def _case(self, conn, cid):
         row = conn.execute('SELECT * FROM cases WHERE id=?', (cid,)).fetchone()
@@ -195,7 +274,7 @@ class Service:
         case = json.loads(row['draft'] if faculty else row['published'])
         return {
             'id':row['id'], 'title':case.get('title','Untitled draft'), 'setting':case.get('setting',''),
-            'description':case.get('description',''), 'patient':{k:case.get('patient',{}).get(k,'') for k in ('name','age','pronouns')},
+            'description':case.get('description',''), 'patient':public_patient(case.get('patient', {})),
             'revision':row['revision'] if faculty else row['published_revision'],
             'published_revision':row['published_revision'], 'hash':row['content_hash'],
             'approved_by':row['approved_by'], 'approved_at':row['approved_at'],
@@ -249,7 +328,7 @@ class Service:
                           'turn':state['revealed'][fact['id']], 'elicited':fact['id'] in state['elicited'], 'attachments':attachments})
         result = {
             'id':row['id'],'case_id':row['case_id'],'title':case['title'],'setting':case['setting'],
-            'patient':{k:case['patient'].get(k,'') for k in ('name','age','pronouns')},'case_hash':row['case_hash'],'case_revision':row['case_revision'],
+            'patient':public_patient(case['patient']),'case_hash':row['case_hash'],'case_revision':row['case_revision'],
             'status':state['status'],'revision':row['revision'],'turn':state['turn'],
             'messages':state['messages'],'chart':chart,'revealed_count':len(chart),
             'elicited_count':len(state['elicited']),'parent_id':row['parent_id'], 'review':state.get('review'),
@@ -283,9 +362,10 @@ class Service:
         # Never hold SQLite's write lock while waiting for an optional provider.
         state=advance(snapshot,original,text,self.router)
         state['requests'][key]=text
-        hits=self.match_literature(text)
+        hits=self.match_course_knowledge(text, snapshot.get('title', ''))
+        hits.extend(self.match_literature(text))
         if hits:
-            state.setdefault('knowledge', []).append({'turn':state['turn'],'records':hits})
+            state.setdefault('knowledge', []).append({'turn':state['turn'],'records':hits[:5]})
         with self.db(True) as conn:
             current=self._encounter(conn,eid,owner)
             current_state=json.loads(current['state'])
@@ -337,7 +417,7 @@ class Service:
             case=json.loads(row['snapshot'])
             if not faculty:
                 case['facts']=[f for f in case['facts'] if f['disclosure']!='faculty_only']
-                case['patient']={k:case['patient'].get(k,'') for k in ('name','age','pronouns')}
+                case['patient']=public_patient(case['patient'])
             return {'product':'Verity Encounter','synthetic':True,'exported_at':now(),
                     'encounter_id':eid,'case_revision':row['case_revision'],'case_hash':row['case_hash'],
                     'case_snapshot':case,'export_snapshot_hash':digest(case),'snapshot_redacted':not faculty,

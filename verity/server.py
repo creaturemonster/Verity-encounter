@@ -150,7 +150,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _bootstrap(self):
         return {'role':self.session['role'],'csrf':self.session['csrf'],
-                'engine':'Optional model ID router' if self.server.service.router else 'Local phrase router · no API key',
+                'engine':'ChatGPT selects topics, phrases a reply from permitted facts, then a separate call reviews grounding' if self.server.service.router else 'Local phrase router · no API key',
                 'model_configured':bool(self.server.service.router),'signals':SIGNAL_LABELS,
                 'synthetic_only':True,'version':'1.0.0'}
 
@@ -166,6 +166,11 @@ class Handler(BaseHTTPRequestHandler):
         faculty=self.session['role']=='faculty'
         if not path.startswith('/api/'):
             if self.command not in ('GET','HEAD'): raise Problem(405,'Method not allowed.')
+            portrait=re.fullmatch(r'/static/patients/([a-z0-9-]+)\.jpg', path)
+            if portrait:
+                file=ROOT/'static'/'patients'/f'{portrait.group(1)}.jpg'
+                if not file.is_file(): raise Problem(404,'Page not found.')
+                return self._send(200, file.read_bytes(), 'image/jpeg')
             allowed={'/':ROOT/'static/index.html','/static/app.js':ROOT/'static/app.js','/static/style.css':ROOT/'static/style.css','/favicon.svg':ROOT/'static/favicon.svg'}
             file=allowed.get(path)
             if not file or not file.exists(): raise Problem(404,'Page not found.')
@@ -302,9 +307,13 @@ def main():
     parser.add_argument('--harvest',action='store_true',default=os.environ.get('VERITY_HARVEST')=='1',help='Run one bounded PubMed citation harvest (finder + loader) in a background thread.')
     args=parser.parse_args()
     router=None
+    semantic_note=''
     if args.semantic:
-        from .provider import OpenAIRouter
-        router=OpenAIRouter(os.environ.get('OPENAI_API_KEY',''),os.environ.get('OPENAI_MODEL',''))
+        from .provider import OpenAIRouter, probe_provider
+        api_key, model = os.environ.get('OPENAI_API_KEY',''), os.environ.get('OPENAI_MODEL','')
+        semantic_note = probe_provider(api_key, model) or ''
+        if not semantic_note:
+            router=OpenAIRouter(api_key, model)
     supplied=os.environ.get('VERITY_FACULTY_PASSWORD') or ''
     password=supplied or secrets.token_urlsafe(12)
     if len(password)<10: parser.error('Faculty passphrase must be at least 10 characters.')
@@ -323,7 +332,13 @@ def main():
     print(f'Open: http://{shown}:{args.port}',flush=True)
     if supplied: print('Faculty passphrase: using VERITY_FACULTY_PASSWORD from the environment.',flush=True)
     else: print(f'Faculty passphrase: {password}',flush=True)
-    print('Mode: '+('external model fact-ID routing (explicitly enabled)' if router else 'offline phrase routing; no external calls'),flush=True)
+    if router:
+        print('Mode: ChatGPT selects topics, phrases a reply from permitted facts, and a separate call reviews grounding. Failures keep the approved wording.',flush=True)
+    elif semantic_note:
+        print('Mode: offline phrase routing. ChatGPT was requested but is not usable yet.',flush=True)
+        print(semantic_note,flush=True)
+    else:
+        print('Mode: offline phrase routing; no external calls',flush=True)
     print('Never enter real patient information. This is not a production server. Ctrl+C stops it.\n',flush=True)
     if args.harvest:
         from .harvest import run_once

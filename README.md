@@ -37,21 +37,24 @@ The engine is an **interview simulation**, not a physiological simulator. It doe
 
 ```
 Learner question
-  -> local phrase router OR optional model fact-ID router
+  -> local phrase router OR optional model topic selection
   -> validate selected IDs (maximum two)
   -> enforce disclosure / prerequisites / scripted communication gate
-  -> quote exact approved patient or report text
+  -> phrase a patient reply from only the permitted facts
+  -> separate model call reviews grounding
+  -> on any failure, show the approved wording instead
+  -> record extracts stay exact
   -> update only the disclosed chart facts
   -> record evidence for later debrief
 ```
 
-The router cannot write a clinical answer. That prevents free-form model wording from entering patient/report messages, but it does **not** prove the selected fact is relevant or the faculty source is correct. Question routing, case correctness and educational validity remain distinct evaluation problems.
+Topic selection does not write the answer. The wording call may rephrase permitted facts, and the review call can reject that rephrasing. A failed, refused, or ungrounded reply is replaced by the approved sentence. That does **not** prove the selected fact is relevant or the faculty source is correct. Question routing, case correctness and educational validity remain distinct evaluation problems.
 
 Local mode is explicitly labeled **Local phrase routing**. It is not an LLM and can miss paraphrases, pronouns and context-dependent questions. It matches case-author-defined whole phrases. Broad prompts do not automatically disclose an entire history.
 
 ## Optional semantic routing
 
-An OpenAI Responses API adapter is included. It selects IDs using a strict JSON schema; the server independently rejects invalid IDs and checks disclosure rules. It never accepts generated clinical prose. Provider errors, malformed outputs and timeouts fall back to the local router with a visible fallback label.
+An OpenAI Responses API adapter is included. Topic selection uses a strict JSON schema; the server independently rejects invalid IDs and checks disclosure rules before any wording is requested. A second call then phrases a reply from the permitted lines, and a third call reviews grounding. Provider errors, malformed outputs, refusals, failed grounding, and timeouts keep the approved wording. Record extracts are not rewritten. Topic-selection failure falls back to the local router.
 
 Set a model identifier available to your own API account; no model availability or pricing is assumed. Enable external routing explicitly:
 
@@ -69,7 +72,7 @@ $env:OPENAI_MODEL="your-supported-model-id"
 py run.py --semantic
 ```
 
-The adapter sends the current question, up to two recent learner questions, topic labels and routing phrases. These phrases can contain clinical terminology. Patient answer fields, patient metadata and attachment bytes are not included. `store=false` is requested; do not interpret that as a comprehensive privacy/compliance guarantee. Only synthetic information is permitted here. Calls may incur charges under the API account.
+Topic selection sends the current question, up to two recent learner questions, topic labels and routing phrases. It does not send patient answers. The wording call sends only the facts permitted for that turn, the patient’s name, age and pronouns, and a short slice of the already disclosed transcript. The grounding call sends the draft reply and those same permitted lines. Unrevealed answers, faculty notes and attachment bytes are not included. `store=false` is requested; do not interpret that as a comprehensive privacy/compliance guarantee. Only synthetic information is permitted here. Calls may incur charges under the API account.
 
 **No live provider call was made in the release evaluation.** Adapter payload, refusal, malformed-response, timeout and fallback behavior were tested with mocks. Confirm model compatibility, external processing terms and routing performance before calling the live-model path demonstrated or validated.
 

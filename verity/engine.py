@@ -1,7 +1,9 @@
-"""Case-independent interview engine. Clinical text is never model-generated.
+"""Case-independent interview engine.
 
-A router selects IDs; the engine controls disclosure and renders exact approved
-answers. Routing accuracy and educational validity are separate from provenance.
+A router may select topic IDs. The engine validates those IDs and applies
+disclosure rules. When the router can speak and review, one reply is phrased
+from the permitted facts and a separate call checks grounding. Any failure
+keeps the approved wording. Records stay exact extracts.
 """
 from __future__ import annotations
 import copy
@@ -11,6 +13,7 @@ import re
 import unicodedata
 from datetime import datetime, timezone
 from typing import Callable
+from .rubric import performance_review
 
 _FEELING = r"(?:difficult|frustrating|scary|hard|worrying|stressful|overwhelming)"
 _DEGREE = r"(?:very |really |so )?"
@@ -209,6 +212,36 @@ def new_state(case: dict) -> dict:
     }
 
 
+def leaks_unrevealed(reply: str, case: dict, revealed: dict) -> bool:
+    """Reject a reply that copies an answer the learner has not been shown."""
+    blob = normalize(reply)
+    for fact in case['facts']:
+        if fact['id'] in revealed:
+            continue
+        answer = normalize(str(fact.get('answer', '')))
+        if len(answer) >= 24 and answer in blob:
+            return True
+    return False
+
+
+def grounded_reply(router, question: str, permitted: list[dict], case: dict, state: dict) -> str | None:
+    """Return reviewed wording, or None so the caller keeps approved text."""
+    try:
+        identity = {k: case.get('patient', {}).get(k, '') for k in ('name', 'age', 'pronouns')}
+        recent = [m for m in state['messages'] if m.get('role') in ('learner', 'patient', 'record')]
+        reply = router.speak(question, permitted, identity, recent)
+        if not valid_text(reply, 800):
+            return None
+        reply = reply.strip()
+        if router.review(reply, permitted) is not True:
+            return None
+        if leaks_unrevealed(reply, case, state['revealed']):
+            return None
+        return reply
+    except Exception:
+        return None
+
+
 def advance(case: dict, state: dict, question: str, router: Callable | None = None) -> dict:
     if state['status'] != 'active': raise ValueError('This encounter has ended.')
     if not valid_text(question, 1500): raise ValueError('Enter a question of 1–1500 characters.')
@@ -251,6 +284,16 @@ def advance(case: dict, state: dict, question: str, router: Callable | None = No
     for fact in allowed:
         state['revealed'].setdefault(fact['id'], turn)
         state['elicited'].setdefault(fact['id'], turn)
+    patient_facts = [fact for fact in allowed if fact['disclosure'] != 'record']
+    reply = None
+    if source == 'model-id-router' and patient_facts and callable(getattr(router, 'speak', None)) and callable(getattr(router, 'review', None)):
+        reply = grounded_reply(router, question, patient_facts, case, state)
+    if reply is not None:
+        state['router_modes'][-1] = 'model-grounded'
+        state['messages'].append({'turn': turn, 'role': 'patient', 'text': reply, 'fact_ids': [fact['id'] for fact in patient_facts], 'source': 'model-grounded', 'at': now()})
+    for fact in allowed:
+        if fact['disclosure'] != 'record' and reply is not None:
+            continue
         role = 'record' if fact['disclosure'] == 'record' else 'patient'
         state['messages'].append({'turn': turn, 'role': role, 'text': fact['answer'], 'fact_ids': [fact['id']], 'source': source, 'at': now()})
     if gated:
@@ -295,5 +338,6 @@ def debrief(case: dict, state: dict) -> dict:
         'grounding': {'exact_quote_messages': exact, 'clinical_messages': len(quotes), 'meaning': 'Text provenance only. This does not measure routing accuracy or clinical correctness.'},
         'unknown_queries': state['unknown_queries'], 'blocked_queries': state['blocked_queries'],
         'review': state.get('review'),
+        'performance_rubric': performance_review(case, state),
         'limitations': 'Text-pattern observations are not validated ratings of empathy. Tone, nonverbal communication, clinical reasoning and real-world competence are not assessed. Faculty review is required.',
     }
